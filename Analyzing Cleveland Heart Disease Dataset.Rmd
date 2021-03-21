@@ -1,0 +1,461 @@
+---
+title: "Mini-Project"
+author: "krishnakanth-20233"
+date: "3/5/2021"
+output: word_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Loading libraries
+
+```{r}
+library(plyr)
+library(tidyverse)
+library(gridExtra)
+library(gmodels)
+library(corrplot)
+library(MASS)
+library(ISLR)
+library(caret)
+library(leaps)
+library(car)
+```
+
+# Data setup
+
+```{r}
+data <- read_csv("heart.csv") # reading dataset
+data <- na.omit(data)
+df<- data # copy of data
+head(data) 
+dim(data)
+```
+
+
+# Data types
+
+```{r}
+glimpse(data) # Datatype and values of the variable
+str(data) # Datatype with explanation of that variable and their values
+```
+
+# conversion to factor
+
+```{r}
+data$sex <- as.factor(data$sex)
+data$cp <- as.factor(data$cp)
+data$fbs <- as.factor(data$fbs)
+data$restecg <- as.factor(data$restecg)
+data$exang <- as.factor(data$exang)
+data$slope <- as.factor(data$slope)
+data$ca <- as.factor(data$ca)
+data$thal <- as.factor(data$thal)
+data$target <- as.factor(data$target)
+str(data)
+```
+
+#  Basic Statistics and Exploratory Data Analysis
+ 
+## Summary
+
+```{r}
+summary(data)
+```
+
+## Variance
+
+```{r}
+var(data[,-c(2,3,6,7,9,11,12,13,14)])
+```
+
+## correlation matrix
+
+```{r}
+cor(data[,-c(2,3,6,7,9,11,12,13,14)])
+```
+
+## Cross tables
+
+```{r}
+CrossTable(data$target,data$sex)
+```
+
+## QQ plots
+
+```{r}
+grid.arrange(
+  ggplot(data,aes(sample=age))+geom_qq(col="darkslategray3")+ggtitle("Age")+geom_qq_line(),
+  ggplot(data,aes(sample=trestbps))+geom_qq(col="deeppink2")+ggtitle("Blood pressure")+geom_qq_line() ,
+  ggplot(data,aes(sample=chol))+geom_qq(col="indianred2")+ggtitle("cholesterol")+geom_qq_line() ,
+  ggplot(data,aes(sample=thalach))+geom_qq(col="mediumpurple1")+ggtitle("Max Heart rate")+geom_qq_line(),
+  ggplot(data,aes(sample=oldpeak))+geom_qq(col="olivedrab")+ggtitle("Depression")+geom_qq_line() ,
+nrow = 3,top = "QQ plots")
+```
+
+## Density curves
+
+```{r}
+grid.arrange(
+  ggplot(data=data, aes(age)) + geom_density(color='chocolate3') ,
+  ggplot(data=data, aes(trestbps)) + geom_density(color='chocolate3') ,
+  ggplot(data=data, aes(chol)) + geom_density(color='chocolate3') , 
+  ggplot(data=data, aes(thalach)) + geom_density(color='chocolate3') ,
+  ggplot(data=data, aes(oldpeak)) + geom_density(color='chocolate3')+xlim(c(-2,6)) ,
+  nrow=3, top = 'Density curves')
+```
+
+## shapiro test
+
+```{r}
+sp<-Map(function(x)cbind(shapiro.test(x)$statistic,shapiro.test(x)$p.value),data[,-c(2,3,6,7,9,11,12,13,14)])
+output<-ldply(sp)
+names(output)<-c("var","W","p.value")
+flag<-0
+for(i in 1:5)
+{
+  if(output[i,]$p.value > 0.05)
+  {
+    if(flag == 0)
+      print("with 95 % confidence interval Normal varibles:")
+    print(output[i,]$var)
+    flag <- flag+1
+  }
+}
+if(flag == 0)
+  print("No variable is Normal in the data with 5% signifinace level")
+```
+
+
+## Histograms 
+
+```{r}
+grid.arrange(
+  ggplot(data=data, aes(age)) + geom_histogram(binwidth = 1.5,color='chocolate3') ,
+  ggplot(data=data, aes(trestbps)) + geom_histogram(binwidth = 3,color='chocolate3') ,
+  ggplot(data=data, aes(chol)) + geom_histogram(binwidth = 6,color='chocolate3') , 
+  ggplot(data=data, aes(thalach)) + geom_histogram(binwidth = 3,color='chocolate3') ,
+  ggplot(data=data, aes(oldpeak)) + geom_histogram(binwidth = 0.3,color='chocolate3') ,
+  nrow=3, top = 'Histograms')
+```
+
+## Bar plots
+
+```{r}
+grid.arrange(
+  ggplot(data=data, aes(sex)) + geom_bar(aes(fill=sex))+scale_fill_manual(values = c("brown1","mediumslateblue")),
+  ggplot(data=data, aes(target)) + geom_bar(aes(fill=target))+scale_fill_manual(values = c("lawngreen","mediumpurple")),
+  ggplot(data=data, aes(exang)) + geom_bar(aes(fill=exang))+scale_fill_manual(values = c("brown1","lightgoldenrod1")),
+  ggplot(data=data, aes(fbs)) + geom_bar(aes(fill=fbs))+scale_fill_manual(values = c("mediumslateblue","lightgoldenrod1")),
+  nrow=2, top = 'Barplots')
+```
+
+## Pie charts
+
+```{r}
+grid.arrange(
+  ggplot(data) + geom_col(aes(x = 1, y = length(data) , fill = cp),position="fill") + coord_polar(theta = "y"),
+  ggplot(data) + geom_col(aes(x = 1, y = length(data) , fill = slope),position="fill") + coord_polar(theta = "y"),
+  ggplot(data) + geom_col(aes(x = 1, y = length(data) , fill = restecg),position="fill") + coord_polar(theta = "y"),
+  ggplot(data) + geom_col(aes(x = 1, y = length(data) , fill = ca),position="fill") + coord_polar(theta = "y"),
+  ggplot(data) + geom_col(aes(x = 1, y = length(data) , fill = thal),position="fill") + coord_polar(theta = "y"),
+nrow=3,top="Pie chart")
+```
+
+## Boxplot
+
+```{r}
+grid.arrange(
+  ggplot(data=data, aes(age)) + geom_boxplot(fill='olivedrab3'),
+  ggplot(data=data, aes(trestbps)) + geom_boxplot(fill='dodgerblue3'),
+  ggplot(data=data, aes(chol)) + geom_boxplot(fill='darksalmon'),
+  ggplot(data=data, aes(thalach)) + geom_boxplot(fill='lightgoldenrod1'),
+  ggplot(data=data, aes(oldpeak)) + geom_boxplot(fill='brown1'),
+  nrow=3, top = 'Boxplots')
+```
+
+## scatterplot
+
+```{r}
+grid.arrange(
+  ggplot(data=data, aes(age,trestbps)) + geom_point(col="deepskyblue1"),
+  ggplot(data=data, aes(chol,age)) + geom_point(col="darkorchid3"),
+  ggplot(data=data, aes(thalach,chol)) + geom_point(col="deeppink3"),
+  ggplot(data=data, aes(oldpeak,thalach)) + geom_point(col="green4"),
+  ggplot(data=data, aes(thalach,trestbps)) + geom_point(col="gray42"),
+  ggplot(data=data, aes(chol,oldpeak)) + geom_point(col="firebrick3")+ylim(c(-1,6)),
+  nrow=3, top = 'scatter plots')
+```
+
+## Corelation plot
+
+```{r}
+corrplot(cor(data[,-c(2,3,6,7,9,11,12,13,14)]),method = "number")
+```
+
+# Splitting data
+
+```{r}
+set.seed(8)
+
+index = sample(nrow(df), 250)
+train = df[index, ]
+test = df[-index, ]
+
+nrow(train)
+nrow(test)
+glimpse(train)
+```
+
+
+----------------------------------------------------------------------------------------------------------------------
+
+# Linear models
+## Linear model1: thalach ~.
+### summary
+
+```{r}
+model1 <- lm(thalach ~.,train)
+summary(model1)
+```
+
+### plot
+
+```{r}
+par(mfrow=c(2,2),mar=c(4,4,2,1))
+plot(model1)
+```
+
+## Linear model2: thalach ~age+exang+slope+cp+chol+target+trestbps
+### summary
+
+```{r}
+model2 <- lm(thalach ~ age+exang+slope+cp+chol+target+trestbps,train)
+summary(model2)
+```
+
+### plot
+
+```{r}
+par(mfrow=c(2,2),mar=c(4,4,2,1))
+plot(model2)
+```
+
+## Linear model3: thalach ~age+exang+slope+target+trestbps
+### summary
+
+```{r}
+model3 <- lm(thalach ~ age+exang+slope+target+trestbps,train)
+summary(model3)
+```
+
+### plot
+
+```{r}
+par(mfrow=c(2,2),mar=c(4,4,2,1))
+plot(model3)
+```
+
+### Shapiro test for model3
+
+```{r}
+shapiro.test(model3$residuals)$p.value
+```
+
+## Normalizing model3
+
+```{r}
+norm <- boxcox(thalach ~ age+exang+slope+target+trestbps,data=train)
+lambda <- norm$x[which.max(norm$y)]
+thalachn <- ((train$thalach)^(lambda)-1)/(lambda)
+```
+
+```{r}
+shapiro.test(thalachn)
+```
+
+## Linear model after normalization
+### summary
+
+```{r}
+linear_model <- lm(thalachn ~age+exang+slope+target+trestbps,train)
+summary(linear_model)
+```
+
+### plot
+
+```{r}
+par(mfrow=c(2,2),mar=c(4,4,2,1))
+plot(linear_model)
+```
+
+### Shapiro test for model3
+
+```{r}
+shapiro.test(linear_model$residuals)$p.value
+```
+
+## Prediction of Linear model
+
+```{r}
+Pred <- predict(linear_model,test,interval = "confidence",level=0.9)
+Pred <- (lambda*Pred+1)**(1/lambda)
+
+actuals <- data.frame(cbind(actuals=test$thalach, predicteds=Pred))
+head(actuals,n=10)
+```
+
+
+
+----------------------------------------------------------------------------------------------------------------------
+
+# Logistic models
+
+## Logistic Model1 :target ~ .
+### summary
+
+```{r}
+logistic_model1 = glm(target ~ ., data = train, family = "binomial")
+summary(logistic_model1)
+```
+
+### predictions on train data and its accuracy
+
+```{r}
+pred <-  predict(logistic_model1, type = "response")
+model_pred <- ifelse(pred>.5, "1", "0")
+mean(train$target==model_pred)
+```
+
+### confusion matrix
+
+```{r}
+mat = table(Predicted=model_pred,actual=train$target)
+mat
+
+con_mat = confusionMatrix(mat, positive="1",threshold = 0.5)
+con_mat
+```
+
+
+## Logistic Model2 :target ~ oldpeak+age+thal+cp+ca+sex+exang
+### summary
+
+```{r}
+logistic_model2 = glm(target ~ oldpeak+age+thal+cp+ca+sex+exang, data = train, family = "binomial")
+summary(logistic_model2)
+```
+
+### predictions on train data and its accuracy
+
+```{r}
+pred <-  predict(logistic_model2, type = "response")
+model_pred <- ifelse(pred>.5, "1", "0")
+mean(train$target==model_pred)
+```
+
+### confusion matrix
+
+```{r}
+mat = table(Predicted=model_pred,actual=train$target)
+mat
+
+con_mat = confusionMatrix(mat, positive="1",threshold = 0.5)
+con_mat
+```
+
+## Function for predection on test data
+
+```{r}
+logistic_pred = function(model, data, pos = 1, neg = 0, cut = 0.5) 
+  {
+    prob = predict(model, newdata = data, type = "response")
+    ifelse(prob > cut, pos, neg)
+  }
+```
+
+## Prediction on test data for logistic_model2
+
+```{r}
+test_pred = logistic_pred(logistic_model2, data = test, pos = 1, neg = 0, cut = 0.5)
+test_tab = table(predicted = test_pred, actual = test$target)
+test_con_mat = confusionMatrix(test_tab, positive = "1")
+test_con_mat
+```
+
+----------------------------------------------------------------------------------------------------------------------
+
+# One way Anova
+## Summary
+
+```{r}
+one_way_anova <- aov(age ~ target,data)
+summary(one_way_anova)
+round(7.52*exp(-05),6)
+```
+
+## plots
+
+```{r}
+par(mfrow=c(2,2),mar=c(4,4,3,2))
+plot(one_way_anova)
+```
+
+## shapiro test
+
+```{r}
+shapiro.test(one_way_anova$residuals)
+```
+
+## Variance test
+
+```{r}
+leveneTest(age ~ target, data, center ="mean")
+```
+
+## one way anova with assumption of equal variance
+
+```{r}
+oneway.test(age ~ target,data,var.equal = T)
+```
+
+----------------------------------------------------------------------------------------------------------------------
+
+# Two way anova
+## Two way anova test (additive model).
+
+Additive model makes an assumption that the two factor variables are independent
+```{r}
+two_way_anova <- aov(age ~ cp+target,data)
+summary(two_way_anova)
+```
+
+## Plot
+
+```{r}
+par(mfrow=c(2,2),mar=c(4,4,3,2))
+plot(two_way_anova)
+```
+
+## checking for independence using interaction terms
+
+```{r}
+two_way_anova <- aov(age ~ cp*target,data)
+summary(two_way_anova)
+```
+
+## shapiro test
+
+```{r}
+shapiro.test(two_way_anova$residuals)
+```
+
+## Variance test
+
+```{r}
+leveneTest(age ~ target*cp, data, center ="mean")
+```
